@@ -91,6 +91,10 @@ type Client interface {
 	DeleteRelease(appID, releaseID string) (*ct.ReleaseDeletion, error)
 	ScheduleAppGarbageCollection(appID string) error
 	Status() (*status.Status, error)
+	CreateSink(sink *ct.Sink) error
+	GetSink(sinkID string) (*ct.Sink, error)
+	DeleteSink(sinkID string) error
+	ListSinks() ([]*ct.Sink, error)
 }
 
 type Config struct {
