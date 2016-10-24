@@ -310,7 +310,7 @@ func appHandler(c handlerConfig) http.Handler {
 	httpRouter.GET("/events/:id", httphelper.WrapHandler(api.GetEvent))
 
 	httpRouter.POST("/sinks", httphelper.WrapHandler(api.CreateSink))
-	httpRouter.GET("/sinks", httphelper.WrapHandler(api.ListSinks))
+	httpRouter.GET("/sinks", httphelper.WrapHandler(api.GetSinks))
 	httpRouter.GET("/sinks/:sink_id", httphelper.WrapHandler(api.GetSink))
 	httpRouter.DELETE("/sinks/:sink_id", httphelper.WrapHandler(api.DeleteSink))
 

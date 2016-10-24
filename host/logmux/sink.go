@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sync"
@@ -13,10 +14,13 @@ import (
 	"time"
 
 	"github.com/boltdb/bolt"
+	ct "github.com/flynn/flynn/controller/types"
 	"github.com/flynn/flynn/discoverd/client"
 	"github.com/flynn/flynn/logaggregator/client"
 	"github.com/flynn/flynn/logaggregator/utils"
+	hh "github.com/flynn/flynn/pkg/httphelper"
 	"github.com/flynn/flynn/pkg/syslog/rfc6587"
+	"github.com/julienschmidt/httprouter"
 	"gopkg.in/inconshreveable/log15.v2"
 )
 
@@ -44,6 +48,58 @@ func NewSinkManager(dbPath string, mux *Mux, logger log15.Logger) *SinkManager {
 		sinks:      make(map[string]Sink),
 		shutdownCh: make(chan struct{}),
 	}
+}
+
+type SinkHTTPAPI struct {
+	sm *SinkManager
+}
+
+func (s *SinkHTTPAPI) GetSinks(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	s.sm.mtx.RLock()
+	sinks := make([]*ct.Sink, 0, len(s.sm.sinks))
+	for _, s := range s.sm.sinks {
+		info := s.Info()
+		sinks = append(sinks, &ct.Sink{
+			ID:     info.ID,
+			Kind:   info.Kind,
+			Config: info.Config,
+		})
+	}
+	s.sm.mtx.RUnlock()
+	hh.JSON(w, 200, sinks)
+}
+
+func (s *SinkHTTPAPI) AddSink(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	var info SinkInfo
+	if err := hh.DecodeJSON(req, &info); err != nil {
+		hh.Error(w, err)
+		return
+	}
+	err := s.sm.AddSink(ps.ByName("id"), &info)
+	if err != nil && err != SinkExistsError {
+		hh.Error(w, err)
+		return
+	}
+	hh.JSON(w, 200, info)
+}
+
+func (s *SinkHTTPAPI) RemoveSink(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+	err := s.sm.RemoveSink(ps.ByName("id"))
+	if err == SinkNotFoundError {
+		hh.ObjectNotFoundError(w, err.Error())
+		return
+	} else if err != nil {
+		hh.Error(w, err)
+		return
+	}
+	hh.JSON(w, 200, struct{}{})
+}
+
+func (sm *SinkManager) RegisterRoutes(r *httprouter.Router) {
+	api := &SinkHTTPAPI{sm}
+	r.GET("/sinks", api.GetSinks)
+	r.PUT("/sinks/:id", api.AddSink)
+	r.DELETE("/sinks/:id", api.RemoveSink)
 }
 
 func (sm *SinkManager) OpenDB() error {
@@ -102,7 +158,7 @@ func (sm *SinkManager) Shutdown() {
 
 type SinkInfo struct {
 	ID     string            `json:"id"`
-	Kind   string            `json:"kind"`
+	Kind   ct.SinkKind       `json:"kind"`
 	Cursor *utils.HostCursor `json:"cursor,omitempty"`
 	Config []byte            `json:"config"`
 }
@@ -131,20 +187,15 @@ func (sm *SinkManager) restore() error {
 	return nil
 }
 
-func (sm *SinkManager) newSink(s *SinkInfo) (sink Sink, err error) {
+func (sm *SinkManager) newSink(s *SinkInfo) (Sink, error) {
 	switch s.Kind {
-	case "logaggregator":
-		sink, err = NewLogAggregatorSink(s)
-		if err != nil {
-			return nil, err
-		}
-	case "tcp":
-		sink, err = NewTCPSink(s)
-		if err != nil {
-			return nil, err
-		}
+	case ct.SinkKindLogaggregator:
+		return NewLogAggregatorSink(s)
+	case ct.SinkKindTCP:
+		return NewTCPSink(s)
+	default:
+		return nil, fmt.Errorf("unknown sink kind: %q", s.Kind)
 	}
-	return sink, nil
 }
 
 func (sm *SinkManager) persistSink(id string) error {
@@ -203,6 +254,7 @@ func (sm *SinkManager) AddSink(id string, s *SinkInfo) error {
 
 func (sm *SinkManager) addSink(id string, s *SinkInfo, persist bool) error {
 	if _, ok := sm.sinks[id]; ok {
+		// TODO: handle sink config change
 		return SinkExistsError
 	}
 	sink, err := sm.newSink(s)
@@ -272,7 +324,7 @@ func (sm *SinkManager) StreamToAggregators(s discoverd.Service) error {
 				}
 				log.Info("connecting to new aggregator", "addr", e.Instance.Addr)
 				cfg, _ := json.Marshal(logAggregatorConfig{Addr: e.Instance.Addr})
-				info := &SinkInfo{Kind: "logaggregator", Config: cfg}
+				info := &SinkInfo{Kind: ct.SinkKindLogaggregator, Config: cfg}
 				sm.AddSink(e.Instance.Addr, info)
 			case discoverd.EventKindDown:
 				log.Info("disconnecting from aggregator", "addr", e.Instance.Addr)

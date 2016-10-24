@@ -784,7 +784,7 @@ func (c *Client) ListSinks() ([]*ct.Sink, error) {
 
 // StreamSinks yields a series of Sink into the provided channel.
 // If since is not nil, only retrieves sink updates since the specified time.
-func (c *Client) StreamSinks(since *time.Time, output chan<- *ct.Sink) (stream.Stream, error) {
+func (c *Client) StreamSinks(since *time.Time, output chan *ct.Sink) (stream.Stream, error) {
 	if since == nil {
 		s := time.Unix(0, 0)
 		since = &s

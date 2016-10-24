@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/flynn/flynn/controller/schema"
@@ -157,7 +158,12 @@ func (c *controllerAPI) GetSink(ctx context.Context, w http.ResponseWriter, req 
 }
 
 // List sinks
-func (c *controllerAPI) ListSinks(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+func (c *controllerAPI) GetSinks(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+	if strings.Contains(req.Header.Get("Accept"), "text/event-stream") {
+		c.streamSinks(ctx, w, req)
+		return
+	}
+
 	list, err := c.sinkRepo.List()
 	if err != nil {
 		respondWithError(w, err)
@@ -169,7 +175,7 @@ func (c *controllerAPI) ListSinks(ctx context.Context, w http.ResponseWriter, re
 
 func (c *controllerAPI) streamSinks(ctx context.Context, w http.ResponseWriter, req *http.Request) (err error) {
 	l, _ := ctxhelper.LoggerFromContext(ctx)
-	ch := make(chan *ct.ExpandedSink)
+	ch := make(chan *ct.Sink)
 	stream := sse.NewStream(w, ch, l)
 	stream.Serve()
 	defer func() {
@@ -203,11 +209,10 @@ func (c *controllerAPI) streamSinks(ctx context.Context, w http.ResponseWriter, 
 	}
 	currentUpdatedAt := since
 	for _, sink := range sinks {
-		expanded := &ct.ExpandedSink{*sink, false}
 		select {
 		case <-stream.Done:
 			return nil
-		case ch <- expanded:
+		case ch <- sink:
 			if sink.UpdatedAt.After(currentUpdatedAt) {
 				currentUpdatedAt = *sink.UpdatedAt
 			}
@@ -217,7 +222,7 @@ func (c *controllerAPI) streamSinks(ctx context.Context, w http.ResponseWriter, 
 	select {
 	case <-stream.Done:
 		return nil
-	case ch <- &ct.ExpandedSink{}:
+	case ch <- &ct.Sink{}:
 	}
 
 	for {
@@ -228,16 +233,16 @@ func (c *controllerAPI) streamSinks(ctx context.Context, w http.ResponseWriter, 
 			if !ok {
 				return sub.Err
 			}
-			var sink ct.ExpandedSink
+			var sink ct.Sink
 			if err := json.Unmarshal(event.Data, &sink); err != nil {
 				l.Error("error deserializing sink event", "event.id", event.ID, "err", err)
 				continue
 			}
-			if event.ObjectType == ct.EventTypeSinkDeletion {
-				sink.Deleted = true
-			}
 			if sink.UpdatedAt.Before(currentUpdatedAt) {
 				continue
+			}
+			if event.ObjectType == ct.EventTypeSinkDeletion {
+				sink.Config = nil
 			}
 			select {
 			case <-stream.Done:

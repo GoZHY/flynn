@@ -473,7 +473,8 @@ type AppGarbageCollectionEvent struct {
 type SinkKind string
 
 const (
-	SinkKindTCP SinkKind = "tcp"
+	SinkKindTCP           SinkKind = "tcp"
+	SinkKindLogaggregator SinkKind = "logaggregator"
 )
 
 type Sink struct {
@@ -482,9 +483,4 @@ type Sink struct {
 	Config    json.RawMessage `json:"config,omitempty"`
 	CreatedAt *time.Time      `json:"created_at,omitempty"`
 	UpdatedAt *time.Time      `json:"updated_at,omitempty"`
-}
-
-type ExpandedSink struct {
-	Sink
-	Deleted bool `json:"deleted, omitempty"`
 }

@@ -75,6 +75,7 @@ var preparedStatements = map[string]string{
 	"backup_update":                         backupUpdate,
 	"backup_select_latest":                  backupSelectLatest,
 	"sink_list":                             sinkListQuery,
+	"sink_list_since":                       sinkListSinceQuery,
 	"sink_select":                           sinkSelectQuery,
 	"sink_insert":                           sinkInsertQuery,
 	"sink_delete":                           sinkDeleteQuery,

@@ -95,6 +95,7 @@ type Client interface {
 	GetSink(sinkID string) (*ct.Sink, error)
 	DeleteSink(sinkID string) error
 	ListSinks() ([]*ct.Sink, error)
+	StreamSinks(since *time.Time, output chan *ct.Sink) (stream.Stream, error)
 }
 
 type Config struct {

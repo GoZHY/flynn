@@ -592,6 +592,8 @@ func (h *Host) ServeHTTP() {
 
 	h.volAPI.RegisterRoutes(r)
 
+	h.sman.RegisterRoutes(r)
+
 	go http.Serve(h.listener, httphelper.ContextInjector("host", httphelper.NewRequestLogger(r)))
 }
 
