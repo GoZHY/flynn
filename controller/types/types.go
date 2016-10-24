@@ -479,7 +479,7 @@ const (
 type Sink struct {
 	ID        string          `json:"id"`
 	Kind      SinkKind        `json:"kind"`
-	Config    json.RawMessage `json:"config"`
+	Config    json.RawMessage `json:"config,omitempty"`
 	CreatedAt *time.Time      `json:"created_at,omitempty"`
 	UpdatedAt *time.Time      `json:"updated_at,omitempty"`
 }

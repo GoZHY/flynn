@@ -408,7 +408,7 @@ SELECT backup_id, status, sha512, size, error, created_at, updated_at, completed
 	sinkListQuery = `
 SELECT sink_id, kind, config, created_at, updated_at FROM sinks WHERE deleted_at IS NULL ORDER BY updated_at DESC`
 	sinkListSinceQuery = `
-SELECT sink_id, kind, config, created_at, updated_at FROM sinks WHERE updated_at >= $1 deleted_at IS NULL ORDER BY updated_at DESC`
+SELECT sink_id, kind, config, created_at, updated_at FROM sinks WHERE updated_at >= $1 AND deleted_at IS NULL ORDER BY updated_at DESC`
 	sinkSelectQuery = `
 SELECT sink_id, kind, config, created_at, updated_at FROM sinks WHERE sink_id = $1`
 	sinkInsertQuery = `

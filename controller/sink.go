@@ -26,8 +26,7 @@ func NewSinkRepo(db *postgres.DB) *SinkRepo {
 	}
 }
 
-func (r *SinkRepo) Add(data interface{}) error {
-	s := data.(*ct.Sink)
+func (r *SinkRepo) Add(s *ct.Sink) error {
 	if s.ID == "" {
 		s.ID = random.UUID()
 	}
@@ -35,7 +34,7 @@ func (r *SinkRepo) Add(data interface{}) error {
 	if err != nil {
 		return err
 	}
-	err = tx.QueryRow("sink_insert").Scan(&s.CreatedAt, &s.UpdatedAt)
+	err = tx.QueryRow("sink_insert", s.ID, s.Kind, []byte(s.Config)).Scan(&s.CreatedAt, &s.UpdatedAt)
 	if err != nil {
 		tx.Rollback()
 		return err
@@ -125,14 +124,14 @@ func (r *SinkRepo) Remove(id string) error {
 }
 
 // Create a new sink
-func (c *controllerAPI) PostSink(ctx context.Context, w http.ResponseWriter, req *http.Request) {
+func (c *controllerAPI) CreateSink(ctx context.Context, w http.ResponseWriter, req *http.Request) {
 	var sink ct.Sink
 	if err := httphelper.DecodeJSON(req, &sink); err != nil {
 		respondWithError(w, err)
 		return
 	}
 
-	if err := schema.Validate(sink); err != nil {
+	if err := schema.Validate(&sink); err != nil {
 		respondWithError(w, err)
 		return
 	}

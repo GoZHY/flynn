@@ -418,6 +418,7 @@ $$ LANGUAGE plpgsql`,
 	migrations.Add(25,
 		`CREATE TABLE sink_kinds (name text PRIMARY KEY)`,
 		`INSERT INTO sink_kinds (name) VALUES ('tcp')`,
+		`INSERT INTO event_types (name) VALUES ('sink'), ('sink_deletion')`,
 		`CREATE TABLE sinks (
 			sink_id uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
 			kind text NOT NULL REFERENCES sink_kinds,
